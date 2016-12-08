@@ -6,12 +6,88 @@
 #include <set>
 #include <map>
 #include <algorithm>
+#include <string>
+
+#include "tokenize_file.cpp"
 
 #include "verb.cpp"
 #include "world.cpp"
 #include "stative_action.cpp"
 #include "object.cpp"
-   
+
+enum class relationship_direction
+{
+    out,
+    in,
+};
+
+enum class relationship_type
+{
+    is_a,
+};
+
+struct node_relationship
+{
+    std::string TargetNodeLabel;
+    relationship_direction Direction;
+    std::string Type;
+};
+
+class node
+{
+    std::string Label;
+    std::vector<node_relationship> Relationships;
+public:
+    node(std::string Label);
+    node();
+
+    void AddRelationship(const node_relationship& Relationship)
+    {
+        Relationships.push_back(Relationship);
+    }
+};
+
+node::node(std::string Label) : Label(Label)
+{
+}
+
+node::node() : node("$UNNAMED$")
+{
+}
+
+class tree
+{
+    // NOTE(tyler): Node labels must be unique for now. May need to change later.
+    std::map<std::string, node> Nodes;
+public:
+    tree(std::string FileName);
+};
+
+tree::tree(std::string FileName)
+{
+    std::vector<std::string> TreeTokens = xish::TokenizeFile("data/hypo_tree.sif", xish::token_mode::delimiter, '\t');
+
+    for(int i = 0; i < TreeTokens.size() / 3; i++)
+    {
+        std::string SourceName = TreeTokens[i];
+        std::string RelationshipName = TreeTokens[i+1];
+        std::string TargetName = TreeTokens[i+2];
+        
+        // NOTE(tyler): Add the 1st or 3rd element of the 3-pair (which are of the form "word relationship word"),
+        // if not already a node in the tree.
+        std::map<std::string, node>::iterator it_start = Nodes.find(SourceName);
+        std::map<std::string, node>::iterator it_end = Nodes.find(TargetName);
+        if(it_start != Nodes.end()) Nodes[SourceName] = node(SourceName);
+        if(it_end != Nodes.end()) Nodes[TargetName] = node(TargetName);
+
+        node_relationship SourceRelationship = {TargetName, relationship_direction::out, RelationshipName};
+        node_relationship TargetRelationship = {SourceName, relationship_direction::in, RelationshipName};
+
+        Nodes[SourceName].AddRelationship(SourceRelationship);
+        Nodes[TargetName].AddRelationship(TargetRelationship);
+    }
+}
+
 int main()
 {
     std::cout.setf(std::ios::boolalpha);
@@ -21,7 +97,7 @@ int main()
     unsigned int WindowHeight = 720;
     sf::RenderWindow Window(sf::VideoMode(WindowWidth, WindowHeight), "");
     Window.setFramerateLimit(60);
-
+    
     stative_verb vHave("has");
     stative_verb vBe("is");
     dynamic_verb vRun("runs");
